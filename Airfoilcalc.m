@@ -1,27 +1,24 @@
-% Airfoil Data Calculator
-% Develped by Yi Tsung Lee
-% First edit 09062019
+% MAE 551 HW1 Airfoil Calculator
+% Airfoil Data Calculator for hw1 all problem by Yi Tsung Lee
+% version eddited on 9/26/2019
 
 clc
 clear
-% ====== File Reading ============== 
 
-%{
-Data = importdata('file1.txt',' ',1) %Creating Data "object"
-%Data.data is the valuew inside
-%Data.textdata is the header now
+% =========== Code stat ==========================
+prompt = 'Type the number of the files to read in : ';
+file_numbers = input(prompt);
 
+for z = 1 : file_numbers
+prompt = 'type the name include the file type to read in :';
+filename = input(prompt,'s');  % record as string
+if isfile(filename)
+else
+    filename = input(prompt,'s');
+end
 
-[x_index,y_index] = size(Data.data);
-data = Data.data ;
-point_index = x_index ;
-%}
-
-
-%
-% Open the file and store the pointer to the file in fid
-% 
-fid = fopen('file2.txt','rt');
+% ===== read the file by the filename ============
+fid = fopen(filename,'rt');
 %
 % fgetl(fid) will read the first line of the file
 % The information is not used
@@ -61,144 +58,143 @@ end
 %
 % Now this data is ready to use.
 %
+ 
+% ====== ectract the value from the file data
 
 [column_index, row_index] = size(data);
-point_index = column_index ;
+point_index(z,1) = column_index ; % number of data point
 for i = 1:column_index
-    xp(1,i)     = data(i,2); % xpoint coordinate
-    yp(1,i)     = data(i,3); % ypoint coordinate
-    v_vinf(1,i) = data(i,4); % v/vinf data
+    xp(z,i)     = data(i,2); % xpoint coordinate
+    yp(z,i)     = data(i,3); % ypoint coordinate
+    v_vinf(z,i) = data(i,4); % v/vinf data
     
-    cf(1,i)     = data(i,7); % local skin friction coefficient
+    cf(z,i)     = data(i,7); % local skin friction coefficient
 end
 
-% ====== Plot of Airfoil Shape ===============
-subplot (2,1,1)
-plot(xp(1,:),yp(1,:),'k-')
-title('Airfoil SHape ')
-xlabel('x/c')
-ylabel('y')
+% ====== Find Stagnation Point =======
+
+for i = 1: point_index(z,1)-1
+    
+  if v_vinf(z,i)*v_vinf(z,i+1) <= 0
+    
+    % exact position of stag pt in decimal  
+    stag_pt(z,1) = i + (0 - v_vinf(z,i)/(v_vinf(z,i+1) - v_vinf(z,i)));
+    % the index of pt right before before stag
+    stag_pt_index(z,1) = i;  
+    % the position in % of the stag in the panel
+    stag_ratio(z,1) = stag_pt(z,1)-stag_pt_index(z,1);  % the position in % of the stag in the panel
+    break %break of for
+  end % end of if
+  
+end 
+
+% ======= interpolating data froom stagnation pt ============
+
+xp_stag(z,1) = xp(z,stag_pt_index(z,1))...
+               + stag_ratio(z,1)*(xp(z,stag_pt_index(z,1)+1)-xp(z,stag_pt_index(z,1)));
+yp_stag(z,1) = yp(z,stag_pt_index(z,1))...
+               + stag_ratio(z,1)*(yp(z,stag_pt_index(z,1)+1)-yp(z,stag_pt_index(z,1)));
+v_vinf_stag(z,1) = v_vinf(z,stag_pt_index(z,1))...
+               + stag_ratio(z,1)*(v_vinf(z,stag_pt_index(z,1)+1)-v_vinf(z,stag_pt_index(z,1)));
+cf_stag(z,1) = cf(z,stag_pt_index(z,1))...
+               + stag_ratio(z,1)*(cf(z,stag_pt_index(z,1)+1)-cf(z,stag_pt_index(z,1)));
+
+% from now on the data above will be inserted on the stag pt 
+% shifting the data after stag_pt_index+1 for one row
+xp(z,stag_pt_index(z,1)+2:point_index(z,1)+1) = xp(z,stag_pt_index(z,1)+1:point_index(z,1));
+yp(z,stag_pt_index(z,1)+2:point_index(z,1)+1) = yp(z,stag_pt_index(z,1)+1:point_index(z,1));
+v_vinf(z,stag_pt_index(z,1)+2:point_index(z,1)+1) = v_vinf(z,stag_pt_index(z,1)+1:point_index(z,1));
+cf(z,stag_pt_index(z,1)+2:point_index(z,1)+1) = cf(z,stag_pt_index(z,1)+1:point_index(z,1));
+
+% insert the interpolating data at stag_pt_index+1
+xp(z,stag_pt_index(z,1)+1) = xp_stag(z,1);
+yp(z,stag_pt_index(z,1)+1) = yp_stag(z,1);
+v_vinf(z,stag_pt_index(z,1)+1) = v_vinf_stag(z,1);
+cf(z,stag_pt_index(z,1)+1) = cf(z,1);
+
+point_index(z,1) = point_index(z,1) +1 ; % after inserting, data pt increase
+stag_pt_index(z,1) = stag_pt_index(z,1) +1 ; % now its the real index of stag_pt
+% Now we have new data set containing the interpolating data in it 
 
 % ====== cp calculation ============
 % cp = 1-(v/vinf)^2
 
-for i = 1:point_index
-
-    cp(1,i) = 1-v_vinf(1,i).^2;
-
+for i = 1:point_index(z,1)
+    cp(z,i) = 1-v_vinf(z,i).^2;
 end
 
+ % ====== Force coefficient from pressure ==================
 
-% ====== Find Stagnation Point =======
-% at stagnation pt : cp = 1; using iteration to find the closet cp point
-% the Cp examination is not in use thiis time.
-%{
-cp0 = 1-cp; % examine the 1-cp to see if it is close to 0
-stag_pt_index =find(cp0 == min(cp0));
-%}
-
-% another way to preciselyfind the stagnation pt is to find where V is change the
-% sign
-for i = 1: point_index-1
+for i =1:point_index(z,1)-1  % panel number is pointnumber -1 
     
-  if v_vinf(1,i)*v_vinf(1,i+1) <= 0  
-    stag_pt = i+(0-v_vinf(1,i)/(v_vinf(1,i+1)-v_vinf(1,i)));  % this is the precise stag pt : a decimal
-    stag_pt_index2 = i;  % the index of pt right before before stag
-    stag_ratio = stag_pt-stag_pt_index2;  % the position in % of the stag in the panel
-    break %break of for
-  end
-  
-end
-
-% ======= interpolating data froom stagnation pt ============
-
-xp_stag = xp(1,stag_pt_index2) + stag_ratio*(xp(1,stag_pt_index2+1)-xp(1,stag_pt_index2));
-yp_stag = yp(1,stag_pt_index2) + stag_ratio*(yp(1,stag_pt_index2+1)-yp(1,stag_pt_index2));
-cp_stag = cp(1,stag_pt_index2) + stag_ratio*(cp(1,stag_pt_index2+1)-cp(1,stag_pt_index2));
-cf_stag = cf(1,stag_pt_index2) + stag_ratio*(cf(1,stag_pt_index2+1)-cf(1,stag_pt_index2));
-
-% ====== Force from pressure ==================
-
-% == Fundamental Assumption == : 
-v_inf = 100;    % Noted the ration of v_inf and p_inf has to be 
-                % large enough so that the decimal error frpm cp will be
-                % calculated
-p_inf = 1;
-pho = 1;
-
-for i =1:point_index-1
-    
-    cp_ave(1,i) = (cp(1,i+1) + cp(1,i))/2 ;
-    px(1,i) = -1*(p_inf +1/2*pho*v_inf^2*cp_ave(1,i))*(yp(1,i+1)-yp(1,i));
-    py(1,i) =    (p_inf +1/2*pho*v_inf^2*cp_ave(1,i))*(xp(1,i+1)-xp(1,i));
+    cp_ave(z,i) = (cp(z,i+1) + cp(z,i))/2 ;
+    cxp(z,i) = -1*cp_ave(z,i)*(yp(z,i+1)-yp(z,i));
+    cyp(z,i) =    cp_ave(z,i)*(xp(z,i+1)-xp(z,i));
 
 end
-X_p = sum(px); % X force from pressure
-Y_p = sum(py); % X force from Pressure
 
-Cx_p = X_p/(1/2*pho*v_inf^2)
-Cy_p = Y_p/(1/2*pho*v_inf^2)
-% ===== Force from Friction ===================
+% ===== Force Coefficient from Friction ===================
 
-for i =1:point_index-1
+for i =1:point_index(z,1)-1
    
-    cf_ave(1,i) = (cf(1,i+1) + cf(1,i))/2 ;
-    if i < stag_pt_index2
-      fx(1,i) = -1/2*pho*v_inf^2*cf_ave(1,i)*(xp(1,i+1)-xp(1,i));
-      fy(1,i) = -1/2*pho*v_inf^2*cf_ave(1,i)*(yp(1,i+1)-yp(1,i));
+    cf_ave(z,i) = (cf(z,i+1) + cf(z,i))/2 ;
+    if i < stag_pt_index(z,1)
+      cxf(z,i) = -cf_ave(z,i)*(xp(z,i+1)-xp(z,i));
+      cyf(z,i) = -cf_ave(z,i)*(yp(z,i+1)-yp(z,i));
     else
-      fx(1,i) =  1/2*pho*v_inf^2*cf_ave(1,i)*(xp(1,i+1)-xp(1,i));
-      fy(1,i) =  1/2*pho*v_inf^2*cf_ave(1,i)*(yp(1,i+1)-yp(1,i));
+      cxf(z,i) =  cf_ave(z,i)*(xp(z,i+1)-xp(z,i));
+      cyf(z,i) =  cf_ave(z,i)*(yp(z,i+1)-yp(z,i));
     end  %end of if
     
 end
+
+% ====== Alpha collection ==========
+prompt = 'Type in the alpha(in degree) for this file :';
+alpha_ra = input(prompt) ;
+alpha(z,1) = alpha_ra*pi/180 ;
+
+% ====== Coefficient calculation =====
+Cx_p(z,1) = sum(cxp(z,:)) ;  % pressure contribution of Cx
+Cy_p(z,1) = sum(cyp(z,:)) ;  % pressure contribution of Cy
  
-X_f = sum(fx)...
-      -1/2*pho*v_inf^2*(cf(1,stag_pt_index2)+cf_stag)/2*(xp_stag-xp(1,stag_pt_index2))...
-      +1/2*pho*v_inf^2*(cf(1,stag_pt_index2+1)+cf_stag)/2*(xp(1,stag_pt_index2+1)-xp_stag); % X force from friction
-Y_f = sum(fy)...
-      -1/2*pho*v_inf^2*(cf(1,stag_pt_index2)+cf_stag)/2*(yp_stag-yp(1,stag_pt_index2)) 
-      +1/2*pho*v_inf^2*(cf(1,stag_pt_index2+1)+cf_stag)/2*(yp(1,stag_pt_index2+1)-yp_stag); % Y force from friction
-Cx_f = X_f/(1/2*pho*v_inf^2)
-Cy_f = Y_f/(1/2*pho*v_inf^2)
+Cx_f(z,1) = sum(cxf(z,:)) ;  % friction contribution of Cx
+Cy_f(z,1) = sum(cyf(z,:)) ; % friction contribution of Cy
 
-% ===== SUmmary of Force =====================
-Cx = (X_p + X_f)/(1/2*pho*v_inf^2*1)  % Force Coeff in x
-Cy = (Y_p + Y_f)/(1/2*pho*v_inf^2*1)  % Force Coeff in y
+Cx(z,1) = Cx_p(z,1) + Cx_f(z,1); 
+Cy(z,1) = Cy_p(z,1) + Cy_f(z,1);
 
-%{
-prompt = 'what Angle of Attack is the airfoil in (degree)?';
-alpha = input(prompt)/180*pi ;
-%}
-
-alpha = 8/180*pi ;
-
-Cl = Cy*cos(alpha) - Cx*sin(alpha)  % Airfoil Lift coeff
-Cd = Cy*sin(alpha) + Cx*cos(alpha)  % Airfoil Drag coeff
+Cl(z,1) = Cy(z,1)*cos(alpha(z,1)) - Cx(z,1)*sin(alpha(z,1));  % Airfoil Lift coeff
+Cd(z,1) = Cy(z,1)*sin(alpha(z,1)) + Cx(z,1)*cos(alpha(z,1));  % Airfoil Drag coeff
  
-Cl_p = Cy_p*cos(alpha) - Cx_p*sin(alpha) % pressure contribution of Cl
-Cd_p = Cy_p*sin(alpha) + Cx_p*cos(alpha) % pressure contribution of cd
+Cl_p(z,1) = Cy_p(z,1)*cos(alpha(z,1)) - Cx_p(z,1)*sin(alpha(z,1)); % pressure contribution of Cl
+Cd_p(z,1) = Cy_p(z,1)*sin(alpha(z,1)) + Cx_p(z,1)*cos(alpha(z,1)); % pressure contribution of cd
 
-Cl_f = Cy_f*cos(alpha) - Cx_f*sin(alpha) % friction contribution of Cl
-Cd_f = Cy_f*sin(alpha) + Cx_f*cos(alpha) % friction contribution of Cd
+Cl_f(z,1) = Cy_f(z,1)*cos(alpha(z,1)) - Cx_f(z,1)*sin(alpha(z,1)); % friction contribution of Cl
+Cd_f(z,1) = Cy_f(z,1)*sin(alpha(z,1)) + Cx_f(z,1)*cos(alpha(z,1)); % friction contribution of Cd
 
-% ======Pitching Moment Coefficient =========
-% 1/4 Cchord Cm 
-
+% ======= Pitching Moment calculation
 for i = 1: point_index-1
     
-     xp_ave(1,i) =(xp(1,i+1)+xp(1,i))/2;
-     yp_ave(1,i) =(yp(1,i+1)+yp(1,i))/2; 
-     mp(1,i) =  -py(1,i)*(xp_ave(1,i)-1/4) ...
-               +px(1,i)*(yp_ave(1,i));
-     mf(1,i) = -fy(1,i)*(xp_ave(1,i)-1/4)...
-               +fx(1,i)*(yp_ave(1,i));
+     xp_ave(z,i) =(xp(z,i+1)+xp(z,i))/2;
+     yp_ave(z,i) =(yp(z,i+1)+yp(z,i))/2; 
+     cmp(z,i) = -cyp(z,i)*(xp_ave(z,i)-1/4)+cxp(z,i)*yp_ave(z,i);
+     cmf(z,i) = -cyf(z,i)*(xp_ave(z,i)-1/4)+cxf(z,i)*yp_ave(z,i);
 end
+Cm_p(z,1) = sum(cmp(z,:));
+Cm_f(z,1) = sum(cmf(z,:));
+Cm(z,1) = Cm_p(z,1) + Cm_f(z,1);
 
-Cm_p = sum(mp)/((1/2*pho*v_inf^2)*1*1)
-Cm_f = sum(mf)/((1/2*pho*v_inf^2)*1*1)
-Cm = sum(mp+mf)/((1/2*pho*v_inf^2)*1*1)
 
+dataset ={"/n",'Total','Presure','Skin-friction';'Cx',Cx(z,1),Cx_p(z,1),Cx_f(z,1);...
+          'Cy',Cy(z,1),Cy_p(z,1),Cy_f(z,1);'Cl',Cl(z,1),Cl_p(z,1),Cl_f(z,1);...
+          'Cd',Cd(z,1),Cd_p(z,1),Cd_f(z,1);'Cm',Cm(z,1),Cm_p(z,1),Cm_f(z,1)}
+end 
+
+prompt = 'Type the probelm # you are solving :';
+problem = input(prompt);
+
+% ===== plot and solution for Porblem 1 =========
+if problem == 1
 % ====== Plot of c_p ===============
 subplot (2,1,1)
 plot(xp(1,:),cp(1,:),'B-')
@@ -213,4 +209,172 @@ plot(xp(1,:),yp(1,:),'k-')
 title('Airfoil SHape ')
 axis equal
 xlabel('x/c')
-ylabel('y')
+ylabel('y')   
+end %end of if
+
+%========== Problem 2 ===============
+if problem == 2
+    
+dataset2 = {' ','0^o','4^o','8^o','12^o','16^o';...
+            'Cl',Cl(1,1),Cl(2,1),Cl(3,1),Cl(4,1),Cl(5,1);...
+            'Cd',Cd(1,1),Cd(2,1),Cd(3,1),Cd(4,1),Cd(5,1);...
+            'Cd_f',Cd_f(1,1),Cd_f(2,1),Cd_f(3,1),Cd_f(4,1),Cd_f(5,1);...
+            'Cd_p',Cd_p(1,1),Cd_p(2,1),Cd_p(3,1),Cd_p(4,1),Cd_p(5,1);...
+            'Cm',Cm(1,1),Cm(2,1),Cm(3,1),Cm(4,1),Cm(5,1)}   
+figure(1)
+subplot(3,2,1)
+plot(alpha(:,1)/pi*180,Cl(:,1),'B-')
+xlabel('alpha(degree)','FontSize',20)
+ylabel('Cl','FontSize',20)
+
+subplot(3,2,2)
+plot(alpha(:,1)/pi*180,Cd(:,1),'B-')
+xlabel('alpha(degree)','FontSize',20)
+ylabel('Cd','FontSize',20)
+
+subplot(3,2,3)
+plot(alpha(:,1)/pi*180,Cd_f(:,1),'B-')
+xlabel('alpha(degree)','FontSize',20)
+ylabel('Cd_f','FontSize',20)
+
+subplot(3,2,4)
+plot(alpha(:,1)/pi*180,Cd_p(:,1),'B-')
+xlabel('alpha(degree)','FontSize',20)
+ylabel('Cd_p','FontSize',20)
+
+subplot(3,2,5)
+plot(alpha(:,1)/pi*180,Cm(:,1),'B-')
+xlabel('alpha','FontSize',20)
+ylabel('Cmc/4','FontSize',20)
+
+subplot(3,2,6)
+plot(xp(1,:),yp(1,:),'K-')
+xlabel('x/c','FontSize',20)
+ylabel('y','FontSize',20)
+axis equal
+title('Airfoil shape')
+
+figure(2)
+subplot(2,2,1)
+plot(xp(1,:),abs(v_vinf(1,:)),'B',xp(2,:),abs(v_vinf(2,:)),'R',...
+     xp(3,:),abs(v_vinf(3,:)),'G',xp(4,:),abs(v_vinf(4,:)),'Y',xp(5,:),abs(v_vinf(5,:)),'K')
+xlabel('x/c','FontSize',20)
+ylabel('V/Vinf','FontSize',20)
+legend('alpha = 0','alpha = 4','alpha = 8','alpha = 12','alpha = 16')
+
+subplot(2,2,3)
+plot(xp(1,:),yp(1,:),'K-')
+xlabel('x/c','FontSize',20)
+ylabel('y','FontSize',20)
+axis equal
+title('Airfoil shape','FontSize',20)
+
+subplot(2,2,2)
+plot(xp(1,:),cp(1,:),'B',xp(2,:),cp(2,:),'R',...
+     xp(3,:),cp(3,:),'G',xp(4,:),cp(4,:),'Y',xp(5,:),cp(5,:),'K')
+xlabel('x/c','FontSize',20)
+ylabel('cp','FontSize',20)
+axis([0 1 -inf 1])
+set(gca,'YDir','reverse')
+legend('alpha = 0','alpha = 4','alpha = 8','alpha = 12','alpha = 16')
+
+subplot(2,2,4)
+plot(xp(1,:),yp(1,:),'K-')
+xlabel('x/c','FontSize',20)
+ylabel('y','FontSize',20)
+axis equal
+title('Airfoil shape','FontSize',20)
+
+end
+
+% ======= problem 3 ========
+if problem  == 3
+figure(1)
+subplot(2,1,1)
+plot(xp(1,:),cp(1,:),'B',xp(2,:),cp(2,:),'R')
+xlabel('x/c','FontSize',20)
+ylabel('cp','FontSize',20)
+set(gca,'YDir','reverse')
+legend('b airfoil','c airfoil')
+
+subplot(2,1,2)
+plot(xp(1,:),yp(1,:),'B-',xp(2,:),yp(2,:),'R-')
+xlabel('x/c','FontSize',20)
+ylabel('y','FontSize',20)
+legend('b airfoil','c airfoil')
+axis equal
+title('Airfoil shape','FontSize',20)
+
+Cm
+
+end
+
+% == problem 4 ========================
+
+if problem == 4
+figure(1)
+subplot(2,1,1)
+plot(xp(1,:),cp(1,:),'B',xp(2,:),cp(2,:),'R')
+xlabel('x/c','FontSize',20)
+ylabel('c_p','FontSize',20)
+set(gca,'YDir','reverse')
+legend('D airfoil','E airfoil')
+
+subplot(2,1,2)
+plot(xp(1,:),yp(1,:),'B-',xp(2,:),yp(2,:),'R-')
+xlabel('x/c','FontSize',20)
+ylabel('y','FontSize',20)
+legend('D airfoil','E airfoil')
+axis equal
+title('Airfoil shape','FontSize',20)
+
+
+figure(2)
+subplot(2,1,1)
+plot(xp(1,:),cf(1,:),'B',xp(2,:),cf(2,:),'R')
+xlabel('x/c','FontSize',20)
+ylabel('c_f','FontSize',20)
+legend('D airfoil','E airfoil')
+
+subplot(2,1,2)
+plot(xp(1,:),yp(1,:),'B-',xp(2,:),yp(2,:),'R-')
+xlabel('x/c','FontSize',20)
+ylabel('y','FontSize',20)
+legend('D airfoil','E airfoil')
+axis equal
+title('Airfoil shape','FontSize',20)    
+end
+
+if problem == 5
+    figure(1)
+subplot(2,1,1)
+plot(xp(1,:),cp(1,:),'B',xp(2,:),cp(2,:),'R')
+xlabel('x/c','FontSize',20)
+ylabel('c_p','FontSize',20)
+set(gca,'YDir','reverse')
+legend('Re = 3.0*10^5, AOA = 1.092^o','Re = 3.0*10^6, AOA = 0.798^o')
+
+subplot(2,1,2)
+plot(xp(1,:),yp(1,:),'B-')
+xlabel('x/c','FontSize',20)
+ylabel('y','FontSize',20)
+legend('a airfoil')
+axis equal
+title('Airfoil shape','FontSize',20)
+
+
+figure(2)
+subplot(2,1,1)
+plot(xp(1,:),cf(1,:),'B',xp(2,:),cf(2,:),'R')
+xlabel('x/c','FontSize',20)
+ylabel('c_f','FontSize',20)
+legend('Re = 3.0*10^5,AOA = 1.092^o','Re = 3.0*10^6,AOA = 0.798^o')
+
+subplot(2,1,2)
+plot(xp(1,:),yp(1,:),'B-')
+xlabel('x/c','FontSize',20)
+ylabel('y','FontSize',20)
+legend('a airfoil')
+axis equal
+title('Airfoil shape','FontSize',20)
+end
